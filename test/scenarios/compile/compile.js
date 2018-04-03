@@ -8,7 +8,7 @@ var Reporter = require("../reporter");
 var sandbox = require("../sandbox");
 var log = console.log;
 
-describe.skip("Repeated compilation of contracts with inheritance", function() {
+describe.only("Repeated compilation of contracts with inheritance", function() {
   var config;
   var contracts;
   var contractPaths;
@@ -17,7 +17,7 @@ describe.skip("Repeated compilation of contracts with inheritance", function() {
   var mapping = {};
 
   var project = path.join(__dirname, '../../sources/inheritance');
-  var names = ["Root", "Branch", "LeafA", "LeafB", "LeafC", "Other", "LibraryA"];
+  var names = ["Root", "Branch", "LeafA", "LeafB", "LeafC", "SameFile1", "SameFile2", "LibraryA"];
   var logger = new MemoryLogger();
 
   before("set up the server", function(done) {
@@ -58,6 +58,10 @@ describe.skip("Repeated compilation of contracts with inheritance", function() {
     }
   }
 
+  function waitSecond() {
+    return new Promise((resolve, reject) => setTimeout(() => resolve(), 1250));
+  }
+
   function getContract(key) {
     return fs.readFileSync(mapping[key].contractPath);
   }
@@ -68,7 +72,10 @@ describe.skip("Repeated compilation of contracts with inheritance", function() {
 
   function getArtifactStats() {
     const stats = {};
-    names.forEach(key => stats[key] = fs.statSync(mapping[key].artifactPath).mtimeMs);
+    names.forEach(key => {
+      const mDate = fs.statSync(mapping[key].artifactPath).mtime.getTime();
+      stats[key] = mDate;
+    });
     return stats;
   }
 
@@ -78,9 +85,9 @@ describe.skip("Repeated compilation of contracts with inheritance", function() {
 
   // -------------Inheritance Graph -----------------------------
   //                                      |
-  //      LibA         LeafA              |
+  //      LibA        LeafA               |    SameFile1 - LeafC
   //     /           /       \            |
-  // Root* - Branch -           - LeafC   |    Other - LeafC
+  // Root* - Branch -           - LeafC   |    SameFile2
   //                 \       /            |
   //                   LeafB              |
   // ------------------------------------------------------------
@@ -94,37 +101,40 @@ describe.skip("Repeated compilation of contracts with inheritance", function() {
 
       const initialTimes = getArtifactStats();
 
-      const root = getContract('Root');
-      touchContract('Root', root);
+      waitSecond().then(() => {
+        const root = getContract('Root');
+        touchContract('Root', root);
 
-      CommandRunner.run("compile", config, function(err) {
-        output = logger.contents();
-        processErr(err, output);
+        CommandRunner.run("compile", config, function(err) {
+          output = logger.contents();
+          processErr(err, output);
 
-        const finalTimes = getArtifactStats();
+          const finalTimes = getArtifactStats();
 
-        try {
-          assert(initialTimes['Root'] < finalTimes['Root'], 'Should update root');
-          assert(initialTimes['Branch'] === finalTimes['Branch'], 'Should not update Branch');
-          assert(initialTimes['LeafA'] === finalTimes['LeafA'], 'Should not update LeafA');
-          assert(initialTimes['LeafB'] === finalTimes['LeafB'], 'Should not update LeafB');
-          assert(initialTimes['LeafC'] === finalTimes['LeafC'], 'Should not update LeafC');
-          assert(initialTimes['LibraryA'] === finalTimes['LibraryA'], 'Should not update LibraryA');
-          assert(initialTimes['Other'] === finalTimes['Other'], 'Should not update Other');
-          done();
-        } catch(err) {
-          err.message += '\n\n' + output;
-          throw new Error(err);
-        }
+          try {
+            assert(initialTimes['Root'] < finalTimes['Root'], 'Should update root');
+            assert(initialTimes['Branch'] === finalTimes['Branch'], 'Should not update Branch');
+            assert(initialTimes['LeafA'] === finalTimes['LeafA'], 'Should not update LeafA');
+            assert(initialTimes['LeafB'] === finalTimes['LeafB'], 'Should not update LeafB');
+            assert(initialTimes['LeafC'] === finalTimes['LeafC'], 'Should not update LeafC');
+            assert(initialTimes['LibraryA'] === finalTimes['LibraryA'], 'Should not update LibraryA');
+            assert(initialTimes['SameFile1'] === finalTimes['SameFile1'], 'Should not update SameFile1');
+            assert(initialTimes['SameFile2'] === finalTimes['SameFile2'], 'Should not update SameFile2');
+            done();
+          } catch(err) {
+            err.message += '\n\n' + output;
+            throw new Error(err);
+          }
+        });
       });
     });
   });
 
   // -------------Inheritance Graph -----------------------------
   //                                      |
-  //      LibA*        LeafA              |
+  //      LibA*        LeafA              |    SameFile1 - LeafC
   //     /           /       \            |
-  // Root* - Branch -           - LeafC   |    Other - LeafC
+  // Root* - Branch -           - LeafC   |    SameFile2
   //                 \       /            |
   //                   LeafB              |
   // ------------------------------------------------------------
@@ -138,37 +148,40 @@ describe.skip("Repeated compilation of contracts with inheritance", function() {
 
       const initialTimes = getArtifactStats();
 
-      const library = getContract('LibraryA');
-      touchContract('LibraryA', library);
+      waitSecond().then(() => {
+        const library = getContract('LibraryA');
+        touchContract('LibraryA', library);
 
-      CommandRunner.run("compile", config, function(err) {
-        output = logger.contents();
-        processErr(err, output);
+        CommandRunner.run("compile", config, function(err) {
+          output = logger.contents();
+          processErr(err, output);
 
-        const finalTimes = getArtifactStats();
+          const finalTimes = getArtifactStats();
 
-        try {
-          assert(initialTimes['Root'] < finalTimes['Root'], 'Should update root');
-          assert(initialTimes['Branch'] === finalTimes['Branch'], 'Should not update Branch');
-          assert(initialTimes['LeafA'] === finalTimes['LeafA'], 'Should not update LeafA');
-          assert(initialTimes['LeafB'] === finalTimes['LeafB'], 'Should not update LeafB');
-          assert(initialTimes['LeafC'] === finalTimes['LeafC'], 'Should not update LeafC');
-          assert(initialTimes['LibraryA'] < finalTimes['LibraryA'], 'Should update LibraryA');
-          assert(initialTimes['Other'] === finalTimes['Other'], 'Should not update Other');
-          done();
-        } catch(err) {
-          err.message += '\n\n' + output;
-          throw new Error(err);
-        }
+          try {
+            assert(initialTimes['Root'] < finalTimes['Root'], 'Should update root');
+            assert(initialTimes['Branch'] === finalTimes['Branch'], 'Should not update Branch');
+            assert(initialTimes['LeafA'] === finalTimes['LeafA'], 'Should not update LeafA');
+            assert(initialTimes['LeafB'] === finalTimes['LeafB'], 'Should not update LeafB');
+            assert(initialTimes['LeafC'] === finalTimes['LeafC'], 'Should not update LeafC');
+            assert(initialTimes['LibraryA'] < finalTimes['LibraryA'], 'Should update LibraryA');
+            assert(initialTimes['SameFile1'] === finalTimes['SameFile1'], 'Should not update SameFile1');
+            assert(initialTimes['SameFile2'] === finalTimes['SameFile2'], 'Should not update SameFile2');
+            done();
+          } catch(err) {
+            err.message += '\n\n' + output;
+            throw new Error(err);
+          }
+        });
       });
     });
   });
 
   // -------------Inheritance Graph -----------------------------
   //                                      |
-  //      LibA         LeafA              |
+  //      LibA         LeafA              |    SameFile1 - LeafC
   //     /           /       \            |
-  // Root* - Branch* -           - LeafC  |    Other - LeafC
+  // Root* - Branch* -           - LeafC  |    SameFile2
   //                 \       /            |
   //                   LeafB              |
   // ------------------------------------------------------------
@@ -180,35 +193,42 @@ describe.skip("Repeated compilation of contracts with inheritance", function() {
       output = logger.contents();
       processErr(err, output);
 
-      const branch = getContract('Branch');
-      touchContract('Branch', branch);
+      const initialTimes = getArtifactStats();
 
-      CommandRunner.run("compile", config, function(err) {
-        output = logger.contents();
-        processErr(err, output);
+      waitSecond().then(() => {
+        const branch = getContract('Branch');
+        touchContract('Branch', branch);
 
-        try {
-          assert(initialTimes['Root'] < finalTimes['Root'], 'Should update root');
-          assert(initialTimes['Branch'] < finalTimes['Branch'], 'Should update Branch');
-          assert(initialTimes['LeafA'] === finalTimes['LeafA'], 'Should not update LeafA');
-          assert(initialTimes['LeafB'] === finalTimes['LeafB'], 'Should not update LeafB');
-          assert(initialTimes['LeafC'] === finalTimes['LeafC'], 'Should not update LeafC');
-          assert(initialTimes['LibraryA'] === finalTimes['LibraryA'], 'Should not update LibraryA');
-          assert(initialTimes['Other'] === finalTimes['Other'], 'Should not update Other');
-          done();
-        } catch(err) {
-          err.message += '\n\n' + output;
-          throw new Error(err);
-        }
+        CommandRunner.run("compile", config, function(err) {
+          output = logger.contents();
+          processErr(err, output);
+
+          const finalTimes = getArtifactStats();
+
+          try {
+            assert(initialTimes['Root'] < finalTimes['Root'], 'Should update root');
+            assert(initialTimes['Branch'] < finalTimes['Branch'], 'Should update Branch');
+            assert(initialTimes['LeafA'] === finalTimes['LeafA'], 'Should not update LeafA');
+            assert(initialTimes['LeafB'] === finalTimes['LeafB'], 'Should not update LeafB');
+            assert(initialTimes['LeafC'] === finalTimes['LeafC'], 'Should not update LeafC');
+            assert(initialTimes['LibraryA'] === finalTimes['LibraryA'], 'Should not update LibraryA');
+            assert(initialTimes['SameFile1'] === finalTimes['SameFile1'], 'Should not update SameFile1');
+            assert(initialTimes['SameFile2'] === finalTimes['SameFile2'], 'Should not update SameFile2');
+            done();
+          } catch(err) {
+            err.message += '\n\n' + output;
+            throw new Error(err);
+          }
+        });
       });
     });
   });
 
   // -------------Inheritance Graph -----------------------------
   //                                       |
-  //      LibA          LeafA*             |
+  //      LibA          LeafA*             |    SameFile1 - LeafC
   //     /            /       \            |
-  // Root* - Branch* -           - LeafC   |    Other - LeafC
+  // Root* - Branch* -           - LeafC   |    SameFile2
   //                  \       /            |
   //                    LeafB              |
   // ------------------------------------------------------------
@@ -220,66 +240,80 @@ describe.skip("Repeated compilation of contracts with inheritance", function() {
       output = logger.contents();
       processErr(err, output);
 
-      const leafA = getContract('LeafA');
-      touchContract('LeafA', leafA);
+      const initialTimes = getArtifactStats();
 
-      CommandRunner.run("compile", config, function(err) {
-        output = logger.contents();
-        processErr(err, output);
+      waitSecond().then(() => {
+        const leafA = getContract('LeafA');
+        touchContract('LeafA', leafA);
 
-        try {
-          assert(initialTimes['Root'] < finalTimes['Root'], 'Should update root');
-          assert(initialTimes['Branch'] < finalTimes['Branch'], 'Should update Branch');
-          assert(initialTimes['LeafA'] < finalTimes['LeafA'], 'Should update LeafA');
-          assert(initialTimes['LeafB'] === finalTimes['LeafB'], 'Should not update LeafB');
-          assert(initialTimes['LeafC'] === finalTimes['LeafC'], 'Should not update LeafC');
-          assert(initialTimes['LibraryA'] === finalTimes['LibraryA'], 'Should not update LibraryA');
-          assert(initialTimes['Other'] === finalTimes['Other'], 'Should not update Other');
-          done();
-        } catch(err) {
-          err.message += '\n\n' + output;
-          throw new Error(err);
-        }
+        CommandRunner.run("compile", config, function(err) {
+          output = logger.contents();
+          processErr(err, output);
+
+          const finalTimes = getArtifactStats();
+
+          try {
+            assert(initialTimes['Root'] < finalTimes['Root'], 'Should update root');
+            assert(initialTimes['Branch'] < finalTimes['Branch'], 'Should update Branch');
+            assert(initialTimes['LeafA'] < finalTimes['LeafA'], 'Should update LeafA');
+            assert(initialTimes['LeafB'] === finalTimes['LeafB'], 'Should not update LeafB');
+            assert(initialTimes['LeafC'] === finalTimes['LeafC'], 'Should not update LeafC');
+            assert(initialTimes['LibraryA'] === finalTimes['LibraryA'], 'Should not update LibraryA');
+            assert(initialTimes['SameFile1'] === finalTimes['SameFile1'], 'Should not update SameFile1');
+            assert(initialTimes['SameFile2'] === finalTimes['SameFile2'], 'Should not update SameFile2');
+            done();
+          } catch(err) {
+            err.message += '\n\n' + output;
+            throw new Error(err);
+          }
+        });
       });
     });
   });
 
   // -------------Inheritance Graph -----------------------------
   //                                       |
-  //      LibA         LeafA*              |
+  //      LibA         LeafA*              |  SameFile1* - LeafC*
   //     /           /        \            |
-  // Root* - Branch* -           - LeafC*  |    Other* - LeafC*
+  // Root* - Branch* -           - LeafC*  |  SameFile2*
   //                 \        /            |
   //                   LeafB*              |
   // ------------------------------------------------------------
 
-  it("Updates everything except LibraryA when LeafC is touched", function(done) {
+  it("Updates everything except LibraryA and SameFile2 when LeafC is touched", function(done) {
     this.timeout(30000);
 
     CommandRunner.run("compile", config, function(err) {
       output = logger.contents();
       processErr(err, output);
 
-      const leafC = getContract('LeafC');
-      touchContract('LeafC', leafC);
+      const initialTimes = getArtifactStats();
 
-      CommandRunner.run("compile", config, function(err) {
-        output = logger.contents();
-        processErr(err, output);
+      waitSecond().then(() => {
+        const leafC = getContract('LeafC');
+        touchContract('LeafC', leafC);
 
-        try {
-          assert(initialTimes['Root'] < finalTimes['Root'], 'Should update root');
-          assert(initialTimes['Branch'] < finalTimes['Branch'], 'Should update Branch');
-          assert(initialTimes['LeafA'] < finalTimes['LeafA'], 'Should update LeafA');
-          assert(initialTimes['LeafB'] < finalTimes['LeafB'], 'Should update LeafB');
-          assert(initialTimes['LeafC'] < finalTimes['LeafC'], 'Should update LeafC');
-          assert(initialTimes['LibraryA'] === finalTimes['LibraryA'], 'Should not update LibraryA');
-          assert(initialTimes['Other'] < finalTimes['Other'], 'Should update Other');
-          done();
-        } catch(err) {
-          err.message += '\n\n' + output;
-          throw new Error(err);
-        }
+        CommandRunner.run("compile", config, function(err) {
+          output = logger.contents();
+          processErr(err, output);
+
+          const finalTimes = getArtifactStats();
+
+          try {
+            assert(initialTimes['Root'] < finalTimes['Root'], 'Should update root');
+            assert(initialTimes['Branch'] < finalTimes['Branch'], 'Should update Branch');
+            assert(initialTimes['LeafA'] < finalTimes['LeafA'], 'Should update LeafA');
+            assert(initialTimes['LeafB'] < finalTimes['LeafB'], 'Should update LeafB');
+            assert(initialTimes['LeafC'] < finalTimes['LeafC'], 'Should update LeafC');
+            assert(initialTimes['LibraryA'] === finalTimes['LibraryA'], 'Should not update LibraryA');
+            assert(initialTimes['SameFile1'] < finalTimes['SameFile1'], 'Should update SameFile1');
+            assert(initialTimes['SameFile2'] < finalTimes['SameFile2'], 'Should update SameFile2');
+            done();
+          } catch(err) {
+            err.message += '\n\n' + output;
+            throw new Error(err);
+          }
+        });
       });
     });
   });
